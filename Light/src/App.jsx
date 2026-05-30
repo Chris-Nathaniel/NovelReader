@@ -337,7 +337,7 @@ function App() {
     null
 
   const chapterParagraphs = useMemo(() => {
-    const text = selectedChapter?.content_text ?? ''
+    const text = selectedChapter?.contentText ?? ''
     if (!text.trim()) {
       return null
     }
