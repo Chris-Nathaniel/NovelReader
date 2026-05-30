@@ -10,7 +10,7 @@ const tabs = [
   { id: 'reading', label: 'Reading' },
 ]
 
-const API_BASE = 'http://localhost:3001'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 const fetchStoredNovels = async () => {
   const response = await fetch(`${API_BASE}/api/novels`)
@@ -252,7 +252,7 @@ function App() {
     setIsImporting(true)
 
     const encodedUrl = encodeURIComponent(url)
-    const source = new EventSource(`http://localhost:3001/api/import-stream?url=${encodedUrl}`)
+    const source = new EventSource(`${API_BASE}/api/import-stream?url=${encodedUrl}`)
     importSourceRef.current = source
 
     source.addEventListener('log', (event) => {
