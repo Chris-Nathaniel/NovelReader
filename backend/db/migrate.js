@@ -22,7 +22,7 @@ async function migrateData() {
     const db = await initializeDatabase()
     console.log('✅ Database initialized\n')
 
-    const DATA_DIR = path.resolve(__dirname, '..', 'data')
+    const DATA_DIR = path.resolve(__dirname, '..', '..', 'Light', 'data')
     const DATA_FILE = path.join(DATA_DIR, 'novels.json')
     const CHAPTERS_DATA_FILE = path.join(DATA_DIR, 'novelchapters.json')
     const COVER_IMAGES_FILE = path.join(DATA_DIR, 'coverImage.json')
@@ -99,9 +99,6 @@ async function migrateData() {
     console.log(
       '2. Update your API endpoints to use the database functions'
     )
-    console.log('3. Test the application locally')
-    console.log('4. Deploy to Vercel')
-
     process.exit(0)
   } catch (error) {
     console.error('❌ Migration failed:', error)

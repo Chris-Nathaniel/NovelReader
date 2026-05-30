@@ -55,7 +55,7 @@ async function verify() {
     console.log('🎉 All checks passed!\n')
     console.log('✅ Database is ready for use')
     console.log('✅ Data has been imported successfully')
-    console.log('\nYou can now run: npm run dev:full\n')
+    console.log('\nYou can now run: npm run dev\n')
 
     process.exit(0)
   } catch (error) {

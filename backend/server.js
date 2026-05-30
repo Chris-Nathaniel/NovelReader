@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url'
 import { spawn } from 'child_process'
 import fs from 'fs/promises'
 import dotenv from 'dotenv'
-import { put } from '@vercel/blob'
 import KuroshiroModule from 'kuroshiro'
 import KuromojiAnalyzerModule from 'kuroshiro-analyzer-kuromoji'
 import { initializeDatabase, setCoverImage, insertNovelWithChapters } from './db/index.js'
@@ -22,11 +21,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const port = process.env.PORT || 3001
 
-app.use(cors())
+// CORS configuration - allow your frontend domain
+const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173'
+app.use(cors({
+  origin: corsOrigin,
+  credentials: true,
+}))
 app.use(express.json({ limit: '20mb' }))
 
 const DATA_DIR = path.resolve(__dirname, 'data')
 const COVERS_DIR = path.join(DATA_DIR, 'covers')
+
+// Create covers directory if it doesn't exist
+try {
+  await fs.mkdir(COVERS_DIR, { recursive: true })
+} catch (error) {
+  console.error('Failed to create covers directory:', error)
+}
 
 app.use('/covers', express.static(COVERS_DIR))
 
@@ -113,7 +124,7 @@ app.post('/api/import', async (req, res) => {
       try {
         const novelData = JSON.parse(stdout)
 
-        // 🆕 Save to database automatically
+        // Save to database automatically
         try {
           const savedNovel = await insertNovelWithChapters(novelData)
           console.log(`✅ Novel saved to database: ${savedNovel.title}`)
@@ -150,7 +161,7 @@ app.post('/api/import', async (req, res) => {
   }
 })
 
-// API endpoint for cover image upload (using Vercel Blob)
+// API endpoint for cover image upload
 app.post('/api/cover-image', async (req, res) => {
   try {
     const { id, fileName, fileData } = req.body
@@ -165,44 +176,61 @@ app.post('/api/cover-image', async (req, res) => {
       return res.status(400).json({ error: 'Invalid fileData format' })
     }
 
-    // Check for Vercel Blob credentials
+    // Check for Vercel Blob credentials (optional - for cloud storage)
     const token = process.env.BLOB_READ_WRITE_TOKEN
-    if (!token) {
-      console.warn('⚠️  BLOB_READ_WRITE_TOKEN not set, skipping Vercel Blob upload')
-      return res.status(500).json({ error: 'Vercel Blob credentials not configured' })
-    }
+    if (token) {
+      // Use Vercel Blob for cloud storage
+      try {
+        const { put } = await import('@vercel/blob')
+        
+        const buffer = Buffer.from(base64Data, 'base64')
+        const timestamp = Date.now()
+        const safeName = `${timestamp}-${path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '_')}`
+        const blobPath = `covers/${safeName}`
 
-    // Convert base64 to buffer
-    const buffer = Buffer.from(base64Data, 'base64')
+        const blob = await put(blobPath, buffer, {
+          access: 'public',
+          token: token,
+        })
 
-    // Generate safe filename
-    const timestamp = Date.now()
-    const safeName = `${timestamp}-${path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '_')}`
-    const blobPath = `covers/${safeName}`
+        console.log(`✅ Cover image uploaded to Vercel Blob: ${blob.url}`)
+        await setCoverImage(Number(id), blob.url)
 
-    try {
-      // Upload to Vercel Blob
-      const blob = await put(blobPath, buffer, {
-        access: 'public',
-        token: token,
-      })
+        return res.status(201).json({
+          id: Number(id),
+          coverImagePath: blob.url,
+        })
+      } catch (blobError) {
+        console.error('Failed to upload to Vercel Blob:', blobError)
+        return res.status(500).json({ error: 'Failed to upload cover image to storage' })
+      }
+    } else {
+      // Save locally to data/covers directory
+      try {
+        const buffer = Buffer.from(base64Data, 'base64')
+        const timestamp = Date.now()
+        const safeName = `${timestamp}-${path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, '_')}`
+        const filePath = path.join(COVERS_DIR, safeName)
 
-      console.log(`✅ Cover image uploaded to Vercel Blob: ${blob.url}`)
+        await fs.mkdir(COVERS_DIR, { recursive: true })
+        await fs.writeFile(filePath, buffer)
 
-      // Save blob URL to database
-      await setCoverImage(Number(id), blob.url)
+        const coverPath = `/covers/${safeName}`
+        console.log(`✅ Cover image saved locally: ${coverPath}`)
+        await setCoverImage(Number(id), coverPath)
 
-      return res.status(201).json({
-        id: Number(id),
-        coverImagePath: blob.url,
-      })
-    } catch (blobError) {
-      console.error('Failed to upload to Vercel Blob:', blobError)
-      return res.status(500).json({ error: 'Failed to upload cover image to storage' })
+        return res.status(201).json({
+          id: Number(id),
+          coverImagePath: coverPath,
+        })
+      } catch (fileError) {
+        console.error('Failed to save cover image locally:', fileError)
+        return res.status(500).json({ error: 'Failed to save cover image' })
+      }
     }
   } catch (error) {
     console.error('Failed to save cover image:', error)
-    return res.status(500).json({ error: 'Failed to save cover image' })
+    res.status(500).json({ error: 'Failed to save cover image' })
   }
 })
 
@@ -249,7 +277,8 @@ async function start() {
     app.listen(port, () => {
       console.log(`\n🚀 API server running on http://localhost:${port}`)
       console.log(`📚 Database connected and ready`)
-      console.log(`🎌 Language conversion service ready\n`)
+      console.log(`🎌 Language conversion service ready`)
+      console.log(`🔗 CORS enabled for: ${process.env.FRONTEND_URL || 'http://localhost:5173'}\n`)
     })
   } catch (error) {
     console.error('Failed to start server:', error)

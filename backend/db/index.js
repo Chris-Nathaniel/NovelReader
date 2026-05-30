@@ -41,7 +41,7 @@ export function getClient() {
 async function runMigrations() {
   try {
     // Read and execute schema
-    const schemaPath = path.join(__dirname, '..', 'db', 'schema.sql')
+    const schemaPath = path.join(__dirname, 'schema.sql')
     const schema = await fs.readFile(schemaPath, 'utf8')
 
     // Split by semicolon and execute each statement
