@@ -274,11 +274,11 @@ async function start() {
     await initDatabase()
     await initKuroshiro()
 
-    app.listen(port, () => {
-      console.log(`\n🚀 API server running on http://localhost:${port}`)
+    app.listen(port, '0.0.0.0', () => {
+      console.log(`\n🚀 API server running on port ${port}`)
       console.log(`📚 Database connected and ready`)
       console.log(`🎌 Language conversion service ready`)
-      console.log(`🔗 CORS enabled for: ${process.env.FRONTEND_URL || 'http://localhost:5173'}\n`)
+      console.log(`🔗 CORS enabled for: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}\n`)
     })
   } catch (error) {
     console.error('Failed to start server:', error)
