@@ -462,10 +462,6 @@
   color: var(--text-h);
 }
 
-.detail-page-card {
-  padding: 5;
-}
-
 .chapter-list ol {
   margin: 16px 0 0;
   padding-left: 1.2rem;
