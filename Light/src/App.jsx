@@ -10,7 +10,7 @@ const tabs = [
   { id: 'reading', label: 'Reading' },
 ]
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3002'
 
 const fetchStoredNovels = async () => {
   const response = await fetch(`${API_BASE}/api/novels`)
@@ -24,6 +24,14 @@ const fetchNovelDetails = async (novelId) => {
   const response = await fetch(`${API_BASE}/api/novels/${novelId}`)
   if (!response.ok) {
     throw new Error(`Failed to load novel details: ${response.status}`)
+  }
+  return response.json()
+}
+
+const fetchChapterContent = async (chapterId) => {
+  const response = await fetch(`${API_BASE}/api/chapters/${chapterId}`)
+  if (!response.ok) {
+    throw new Error(`Failed to load chapter content: ${response.status}`)
   }
   return response.json()
 }
@@ -60,6 +68,8 @@ function App() {
   const [selectedNovelId, setSelectedNovelId] = useState(novels[0]?.id ?? null)
   const [selectedSection, setSelectedSection] = useState('all')
   const [selectedChapterId, setSelectedChapterId] = useState(null)
+  const [chapterLoadingError, setChapterLoadingError] = useState('')
+  const [isLoadingChapters, setIsLoadingChapters] = useState(false)
 
   const getChapterCount = (novel) => novel?.chapters?.length ?? novel?.chapterCount ?? 0
 
@@ -83,24 +93,36 @@ function App() {
   }, [])
 
   useEffect(() => {
-    let canceled = false
+    if (!selectedNovelId) return
 
     const novel = novels.find((item) => item.id === selectedNovelId)
-    if (!novel || !selectedNovelId || novel.chapters?.length > 0) {
-      return () => {
-        canceled = true
-      }
+    if (novel?.chapters?.length > 0) {
+      setIsLoadingChapters(false)
+      setChapterLoadingError('')
+      return
     }
 
+    let canceled = false
+
     const loadNovelDetails = async () => {
+      setIsLoadingChapters(true)
+      setChapterLoadingError('')
       try {
         const fullNovel = await fetchNovelDetails(selectedNovelId)
         if (!canceled) {
-          setNovels((prev) => prev.map((item) => (item.id === selectedNovelId ? fullNovel : item)))
+          if (fullNovel?.chapters?.length > 0 || fullNovel?.chapters) {
+            setNovels((prev) => prev.map((item) => (item.id === selectedNovelId ? fullNovel : item)))
+            setIsLoadingChapters(false)
+          } else {
+            setChapterLoadingError('No chapters found for this novel')
+            setIsLoadingChapters(false)
+          }
         }
       } catch (error) {
         if (!canceled) {
           console.warn('Failed to load novel content:', error)
+          setChapterLoadingError(`Failed to load chapters: ${error.message}`)
+          setIsLoadingChapters(false)
         }
       }
     }
@@ -111,6 +133,53 @@ function App() {
       canceled = true
     }
   }, [selectedNovelId, novels])
+
+  // Load chapter content when a chapter is selected
+  useEffect(() => {
+    if (!selectedChapterId || !selectedNovelId) return
+
+    const novel = novels.find((n) => n.id === selectedNovelId)
+    const chapter = novel?.chapters?.find((ch) => ch.id === selectedChapterId)
+    
+    // If chapter already has content, don't fetch again
+    if (chapter?.contentText || chapter?.content) {
+      return
+    }
+
+    let canceled = false
+
+    const loadChapterContent = async () => {
+      try {
+        const fullChapter = await fetchChapterContent(selectedChapterId)
+        
+        if (!canceled) {
+          setNovels((prev) =>
+            prev.map((n) => {
+              if (n.id === selectedNovelId) {
+                return {
+                  ...n,
+                  chapters: n.chapters.map((ch) =>
+                    ch.id === selectedChapterId
+                      ? { ...ch, ...fullChapter }
+                      : ch
+                  ),
+                }
+              }
+              return n
+            })
+          )
+        }
+      } catch (error) {
+        console.error('Failed to load chapter content:', error)
+      }
+    }
+
+    loadChapterContent()
+
+    return () => {
+      canceled = true
+    }
+  }, [selectedChapterId, selectedNovelId])
 
   const filteredNovels = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -294,7 +363,7 @@ function App() {
         importSourceRef.current = null
       }
     })
-
+    
     source.addEventListener('error', (event) => {
       const message = event?.data || 'Import failed.'
       setImportError(message)
@@ -337,10 +406,20 @@ function App() {
     null
 
   const chapterParagraphs = useMemo(() => {
-    const text = selectedChapter?.contentText ?? ''
+    // Try contentText first, then fall back to content (which is HTML)
+    let text = selectedChapter?.contentText ?? ''
+    
+    // If contentText is empty but content exists, extract text from HTML
+    if (!text.trim() && selectedChapter?.content) {
+      const div = document.createElement('div')
+      div.innerHTML = selectedChapter.content
+      text = div.textContent || div.innerText || ''
+    }
+    
     if (!text.trim()) {
       return null
     }
+    
     return text
       .split(/\n{2,}/)
       .map((paragraph) => paragraph.trim())
@@ -384,42 +463,34 @@ function App() {
     const loadAnalysis = async () => {
       if (!chapterParagraphs?.length) {
         setParagraphAnalysis([])
+        setAnalysisLoading(false)
         return
       }
 
       setAnalysisLoading(true)
       try {
-        const analysis = await Promise.all(
-          chapterParagraphs.map(async (paragraph) => {
-            try {
-              const response = await fetch(`${API_BASE}/api/convert`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ text: paragraph }),
-              })
+        // Batch convert all paragraphs at once instead of one-by-one
+        const response = await fetch(`${API_BASE}/api/convert-batch`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ paragraphs: chapterParagraphs }),
+        })
 
-              if (!response.ok) {
-                throw new Error(`API error: ${response.status}`)
-              }
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`)
+        }
 
-              const data = await response.json()
-              return { reading: data.reading }
-            } catch (error) {
-              console.error('Failed to convert paragraph:', error)
-              return { reading: 'Error loading hiragana' }
-            }
-          }),
-        )
-
+        const data = await response.json()
         if (!canceled) {
-          setParagraphAnalysis(analysis)
+          setParagraphAnalysis(data.results || [])
         }
       } catch (error) {
         console.error('Failed to load analysis:', error)
         if (!canceled) {
-          setParagraphAnalysis([])
+          // Fallback: create empty analysis for all paragraphs
+          setParagraphAnalysis(chapterParagraphs.map(() => ({ reading: '' })))
         }
       } finally {
         if (!canceled) {
@@ -496,6 +567,9 @@ function App() {
             </li>
           ))}
         </ul>
+        <svg className="navmenu" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="25" height="25" viewBox="0 0 50 50">
+          <path d="M 3 9 A 1.0001 1.0001 0 1 0 3 11 L 47 11 A 1.0001 1.0001 0 1 0 47 9 L 3 9 z M 3 24 A 1.0001 1.0001 0 1 0 3 26 L 47 26 A 1.0001 1.0001 0 1 0 47 24 L 3 24 z M 3 39 A 1.0001 1.0001 0 1 0 3 41 L 47 41 A 1.0001 1.0001 0 1 0 47 39 L 3 39 z"></path>
+        </svg>
       </nav>
 
       {page === 'home' && (
@@ -507,16 +581,6 @@ function App() {
               <p className="hero-copy">
                 Add new titles with a single Syosetu link, preview the cover, and keep your library tidy.
               </p>
-              <div className="hero-actions">
-                <button
-                  type="button"
-                  className="hero-button"
-                  onClick={handleImport}
-                  disabled={isImporting}
-                >
-                  {isImporting ? 'Importing…' : 'Import now'}
-                </button>
-              </div>
             </div>
 
             <div className="hero-panel-card">
@@ -598,7 +662,7 @@ function App() {
         <section className="catalog-panel">
           <div className="catalog-controls">
             <div>
-              <h2>Light novel catalogue</h2>
+              <h2>Catalogue</h2>
               <p>Browse novels in a vertical carousel layout with five columns.</p>
             </div>
             <label className="search-field">
@@ -684,17 +748,12 @@ function App() {
                 className="cover-thumb"
               />
               <div className="detail-header-text">
-                <span className="eyebrow">Chapter list</span>
                 <h2>{selectedNovel.title}</h2>
                 <p className="detail-description">{selectedNovel.description}</p>
                 <div className="detail-meta-row">
                   <div className="detail-meta-item">
                     <span>Author:</span>
                     <strong>{selectedNovel.author}</strong>
-                  </div>
-                  <div className="detail-meta-item">
-                    <span>Year Released:</span>
-                    <strong>{selectedNovel.year}</strong>
                   </div>
                   <div className="detail-meta-item">
                     <span>Total Chapters:</span>
@@ -707,40 +766,59 @@ function App() {
 
           <article className="selected-panel detail-page-card">
             <div className="chapter-list">
-              <div className="section-heading">
-                <div>
-                  <h3>Chapters</h3>
-                  <span>{displayedChapters.length} items</span>
+              {isLoadingChapters && (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
+                  <p>Loading chapters...</p>
                 </div>
-                {novelSections.length > 0 && (
-                  <label className="section-filter">
-                    <span>Filter by section:</span>
-                    <select
-                      value={selectedSection}
-                      onChange={(e) => setSelectedSection(e.target.value)}
-                    >
-                      <option value="all">All sections</option>
-                      {novelSections.map((section) => (
-                        <option key={section} value={section}>
-                          {section}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-              </div>
-              <ol>
-                {displayedChapters.map((chapter) => (
-                  <li
-                    key={chapter.id}
-                    className={chapter.id === selectedChapterId ? 'active' : ''}
-                    onClick={() => openChapter(chapter.id)}
-                  >
-                    <strong>{chapter.title}</strong>
-                    {chapter.section && <p className="chapter-section">{chapter.section}</p>}
-                  </li>
-                ))}
-              </ol>
+              )}
+              {chapterLoadingError && (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#d32f2f', backgroundColor: '#ffebee', borderRadius: '4px' }}>
+                  <strong>Error:</strong> {chapterLoadingError}
+                </div>
+              )}
+              {!isLoadingChapters && !chapterLoadingError && displayedChapters.length === 0 && (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                  <p>No chapters available</p>
+                </div>
+              )}
+              {!isLoadingChapters && displayedChapters.length > 0 && (
+                <>
+                  <div className="section-heading">
+                    <div>
+                      <h3>Chapters</h3>
+                      <span>{displayedChapters.length} items</span>
+                    </div>
+                    {novelSections.length > 0 && (
+                      <label className="section-filter">
+                        <span>Filter by section:</span>
+                        <select
+                          value={selectedSection}
+                          onChange={(e) => setSelectedSection(e.target.value)}
+                        >
+                          <option value="all">All sections</option>
+                          {novelSections.map((section) => (
+                            <option key={section} value={section}>
+                              {section}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
+                  <ol>
+                    {displayedChapters.map((chapter) => (
+                      <li
+                        key={chapter.id}
+                        className={chapter.id === selectedChapterId ? 'active' : ''}
+                        onClick={() => openChapter(chapter.id)}
+                      >
+                        <strong>{chapter.title}</strong>
+                        {chapter.section && <p className="chapter-section">{chapter.section}</p>}
+                      </li>
+                    ))}
+                  </ol>
+                </>
+              )}
             </div>
           </article>
         </section>
@@ -750,15 +828,8 @@ function App() {
         <section className="detail-page">
           <div className="detail-panel-header">
             <div>
-              <span className="eyebrow">Reading</span>
               <h2>{selectedChapter.title}</h2>
               <p className="detail-description">{selectedNovel.title}</p>
-              <div className="detail-meta-row">
-                <div className="detail-meta-item">
-                  <span>Chapter:</span>
-                  <strong>{currentChapterIndex + 1} / {getChapterCount(selectedNovel)}</strong>
-                </div>
-              </div>
             </div>
             <button type="button" className="back-button" onClick={() => navigateTo('novel')}>
               ← Back to chapter list
@@ -786,6 +857,11 @@ function App() {
 
           <article className="chapter-content">
             <div className="chapter-text">
+              {analysisLoading && (
+                <div className="loading-indicator" style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
+                  Loading hiragana conversion... This may take a moment.
+                </div>
+              )}
               {chapterParagraphs ? (
                 chapterParagraphs.map((paragraph, index) => (
                   <div key={index} className="chapter-paragraph-wrap">

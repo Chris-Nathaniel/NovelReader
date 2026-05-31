@@ -97,7 +97,7 @@ export async function updateNovel(id, novelData) {
 
 export async function getNovelChapters(novelId) {
   const result = await client.execute(
-    'SELECT * FROM chapters WHERE novelId = ? ORDER BY chapterNumber ASC',
+    'SELECT id, novelId, chapterNumber, title, section, createdAt FROM chapters WHERE novelId = ? ORDER BY chapterNumber ASC',
     [novelId]
   )
   return result.rows || []
@@ -107,6 +107,14 @@ export async function getChapterByNumber(novelId, chapterNumber) {
   const result = await client.execute(
     'SELECT * FROM chapters WHERE novelId = ? AND chapterNumber = ?',
     [novelId, chapterNumber]
+  )
+  return result.rows?.[0] || null
+}
+
+export async function getChapterById(chapterId) {
+  const result = await client.execute(
+    'SELECT * FROM chapters WHERE id = ?',
+    [chapterId]
   )
   return result.rows?.[0] || null
 }

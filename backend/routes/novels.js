@@ -4,6 +4,7 @@ import {
   getNovelById,
   getNovelChapters,
   getChapterByNumber,
+  getChapterById,
   getCoverImage,
   setCoverImage,
   insertChapter,
@@ -27,13 +28,21 @@ router.get('/novels', async (req, res) => {
   try {
     const novels = await getAllNovels()
     
-    // Fetch cover images for all novels
+    // Fetch cover images for all novels in parallel
     const novelsWithCovers = await Promise.all(
       novels.map(async (novel) => {
-        const coverImage = await getCoverImage(novel.id)
-        return {
-          ...novel,
-          coverImage: buildCoverUrl(req, coverImage?.coverImagePath),
+        try {
+          const coverImage = await getCoverImage(novel.id)
+          return {
+            ...novel,
+            coverImage: buildCoverUrl(req, coverImage?.coverImagePath),
+          }
+        } catch (error) {
+          console.error(`Error fetching cover for novel ${novel.id}:`, error)
+          return {
+            ...novel,
+            coverImage: null,
+          }
         }
       })
     )
@@ -52,17 +61,18 @@ router.get('/novels', async (req, res) => {
 router.get('/novels/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const novel = await getNovelById(parseInt(id))
+    const novelId = parseInt(id)
+
+    // Fetch everything in parallel for speed
+    const [novel, chapters, coverImage] = await Promise.all([
+      getNovelById(novelId),
+      getNovelChapters(novelId),
+      getCoverImage(novelId),
+    ])
 
     if (!novel) {
       return res.status(404).json({ error: 'Novel not found' })
     }
-
-    // Fetch chapters for this novel
-    const chapters = await getNovelChapters(parseInt(id))
-
-    // Fetch cover image for this novel
-    const coverImage = await getCoverImage(parseInt(id))
 
     // Return novel with chapters and cover image attached
     res.json({
@@ -108,6 +118,29 @@ router.get('/novels/:id/chapters/:chapterNumber', async (req, res) => {
       return res.status(404).json({ error: 'Chapter not found' })
     }
 
+    res.json(chapter)
+  } catch (error) {
+    console.error('Error fetching chapter:', error)
+    res.status(500).json({ error: 'Failed to fetch chapter' })
+  }
+})
+
+/**
+ * GET /api/chapters/:chapterId
+ * Get chapter content by chapter ID (for on-demand loading)
+ */
+router.get('/chapters/:chapterId', async (req, res) => {
+  try {
+    const { chapterId } = req.params
+    const chapter = await getChapterById(parseInt(chapterId))
+
+    if (!chapter) {
+      return res.status(404).json({ error: 'Chapter not found' })
+    }
+
+    // If contentText is empty/missing but content exists, the frontend will extract it
+    // No need to do it here - let the frontend handle it for efficiency
+    
     res.json(chapter)
   } catch (error) {
     console.error('Error fetching chapter:', error)

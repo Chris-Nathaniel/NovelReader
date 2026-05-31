@@ -13,13 +13,17 @@ import novelRoutes from './routes/novels.js'
 // Load environment variables
 dotenv.config({ path: '.env.local' })
 
+
 const getDefaultExport = (module) => module?.default?.default ?? module?.default ?? module
 const Kuroshiro = getDefaultExport(KuroshiroModule)
 const KuromojiAnalyzer = getDefaultExport(KuromojiAnalyzerModule)
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
-const port = process.env.PORT || 3001
+const port = process.env.PORT || 3002
+
+// Log configuration AFTER loading environment variables
+console.log(`🔧 Starting server with configuration: PORT=${port}, CORS_ORIGIN=${process.env.CORS_ORIGIN || 'http://localhost:5173'}`)
 
 // CORS configuration - allow your frontend domain
 const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173'
@@ -256,6 +260,42 @@ app.post('/api/convert', async (req, res) => {
   } catch (error) {
     console.error('Conversion error:', error)
     res.status(500).json({ error: 'Failed to convert text' })
+  }
+})
+
+// API endpoint for batch text conversion
+app.post('/api/convert-batch', async (req, res) => {
+  try {
+    const { paragraphs } = req.body
+
+    if (!Array.isArray(paragraphs)) {
+      return res.status(400).json({ error: 'paragraphs must be an array' })
+    }
+
+    if (!kuroshiro) {
+      return res.status(503).json({ error: 'Kuroshiro not initialized' })
+    }
+
+    // Convert all paragraphs in parallel
+    const results = await Promise.all(
+      paragraphs.map(async (paragraph) => {
+        try {
+          const reading = await kuroshiro.convert(paragraph, {
+            to: 'hiragana',
+            mode: 'furigana',
+          })
+          return { reading }
+        } catch (error) {
+          console.error('Batch conversion error for paragraph:', error)
+          return { reading: '' }
+        }
+      })
+    )
+
+    res.json({ results })
+  } catch (error) {
+    console.error('Batch conversion error:', error)
+    res.status(500).json({ error: 'Failed to convert paragraphs' })
   }
 })
 
