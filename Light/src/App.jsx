@@ -392,7 +392,7 @@ function App() {
         const analysis = await Promise.all(
           chapterParagraphs.map(async (paragraph) => {
             try {
-              const response = await fetch('http://localhost:3001/api/convert', {
+              const response = await fetch(`${API_BASE}/api/convert`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
