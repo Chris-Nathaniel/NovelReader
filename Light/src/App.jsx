@@ -903,8 +903,8 @@ function App() {
                         title={furiganaStates[index] ? 'Hide furigana' : 'Show furigana'}
                         onClick={() => toggleFurigana(index)}
                       >
-                        <svg className="furigana-icon" viewBox="0 0 24 24" aria-hidden="true">
-                          <text x="2" y="18" fontSize="14" fontWeight="bold" fill="currentColor">ふ</text>
+                        <svg className="furigana-icon" viewBox="0 0 25 25" aria-hidden="true">
+                          <text x="5" y="18" fontSize="14" fontWeight="bold" fill="currentColor">ふ</text>
                         </svg>
                       </button>
                     </div>

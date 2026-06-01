@@ -531,8 +531,8 @@
   flex: 1 1 100px;
   min-width: 140px;
   border: none;
-  background: rgba(77, 124, 255, 0.12);
-  color: rgb(65, 63, 63);
+  background: rgb(80, 146, 188, 0.2);
+  color: rgb(15, 13, 13);
   padding: 14px 18px;
   border-radius: 16px;
   font-weight: 700;
@@ -566,11 +566,14 @@
   display: flex;
   position: absolute;
   flex-direction: column;
-  gap: 2px;
+  gap: 5px;
+  align-items: center;
+  top: 50%;
+  right: 0px;
+  transform: translateY(-50%);
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.2s ease, visibility 0.2s ease;
-  right:0px;
 }
 
 .chapter-paragraph-wrap:hover .paragraph-buttons {
@@ -579,7 +582,7 @@
 }
 
 .chapter-paragraph-wrap p{
-  width: 95%;
+  width: 94%;
 }
 
 .copy-paragraph-button {
@@ -594,17 +597,18 @@
   color: rgba(4, 3, 3, 0.641);
   cursor: pointer;
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
-  background-color: rgba(255, 255, 255, 0);
+  background-color: rgba(255, 255, 255, 1);
   transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .copy-paragraph-button:hover {
   transform: scale(1.02);
+  background: rgba(99, 102, 241, 0.16);
 }
 
 .copy-paragraph-button.copied {
   background: rgba(34, 197, 94, 0.16);
-  color: #074f21;
+  color: black;
 }
 
 .copy-paragraph-button.copied:hover {
@@ -617,7 +621,7 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  padding: 0;
+  padding: 1px;
   border: none;
   border-radius: 999px;
   color: rgba(4, 3, 3, 0.641);
@@ -633,7 +637,7 @@
 
 .furigana-toggle-button.active {
   background: rgba(99, 102, 241, 0.16);
-  color: #3730a3;
+  color: #cb2c2c;
 }
 
 .furigana-toggle-button.active:hover {
@@ -860,7 +864,10 @@ rt {
   margin: 0 0 4px;
   font-weight: 500;
 }
-
+.navmenu{
+  display: none;
+  cursor: pointer;
+}
 @media (max-width: 980px) {
   .card-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -896,6 +903,9 @@ rt {
 
     box-shadow: 0 18px 45px rgba(13, 50, 110, 0.12);
     backdrop-filter: blur(12px);
+  }
+  .navmenu{
+    display: flex;
   }
 
   .brand {
@@ -1021,6 +1031,18 @@ rt {
     flex-direction: column;
     align-items: center;
     text-align: center;
+  }
+
+  .detail-panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .back-button {
+    width: 100%;
+    text-align: center;
+    order: 1;
   }
 
   .cover-thumb {
