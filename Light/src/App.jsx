@@ -429,6 +429,7 @@ function App() {
   const [paragraphAnalysis, setParagraphAnalysis] = useState([])
   const [analysisLoading, setAnalysisLoading] = useState(true)
   const [copiedParagraphIndex, setCopiedParagraphIndex] = useState(null)
+  const [furiganaStates, setFuriganaStates] = useState({})
   const [, startTransition] = useTransition()
 
   const extractPlainText = (html) => {
@@ -455,6 +456,13 @@ function App() {
     } catch (error) {
       console.error('Failed to copy paragraph text:', error)
     }
+  }
+
+  const toggleFurigana = (index) => {
+    setFuriganaStates((prev) => ({
+      ...prev,
+      [index]: !prev[index],
+    }))
   }
 
   useEffect(() => {
@@ -859,35 +867,49 @@ function App() {
             <div className="chapter-text">
               {analysisLoading && (
                 <div className="loading-indicator" style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
-                  Loading hiragana conversion... This may take a moment.
+                  Loading furigana... This may take a moment.
                 </div>
               )}
               {chapterParagraphs ? (
                 chapterParagraphs.map((paragraph, index) => (
                   <div key={index} className="chapter-paragraph-wrap">
-                    <button
-                      type="button"
-                      className={`copy-paragraph-button ${copiedParagraphIndex === index ? 'copied' : ''}`}
-                      aria-label={copiedParagraphIndex === index ? 'Copied' : 'Copy chapter paragraph'}
-                      onClick={() => copyParagraphText(paragraphAnalysis[index]?.reading || paragraph, index)}
-                    >
-                      {copiedParagraphIndex === index ? (
-                        <svg className="copy-icon" viewBox="0 0 24 24" aria-hidden="true">
-                          <path
-                            d="M20.285 6.708a1 1 0 0 0-1.414-1.416L9 15.164l-3.87-3.87a1 1 0 0 0-1.414 1.414l4.577 4.577a1 1 0 0 0 1.414 0l10.578-10.577Z"
-                            fill="currentColor"
-                          />
+                    <div className="paragraph-buttons">
+                      <button
+                        type="button"
+                        className={`copy-paragraph-button ${copiedParagraphIndex === index ? 'copied' : ''}`}
+                        aria-label={copiedParagraphIndex === index ? 'Copied' : 'Copy chapter paragraph'}
+                        onClick={() => copyParagraphText(paragraphAnalysis[index]?.reading || paragraph, index)}
+                      >
+                        {copiedParagraphIndex === index ? (
+                          <svg className="copy-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                              d="M20.285 6.708a1 1 0 0 0-1.414-1.416L9 15.164l-3.87-3.87a1 1 0 0 0-1.414 1.414l4.577 4.577a1 1 0 0 0 1.414 0l10.578-10.577Z"
+                              fill="currentColor"
+                            />
+                          </svg>
+                        ) : (
+                          <svg className="copy-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                              d="M16 1H5a2 2 0 0 0-2 2v14h2V3h11V1Zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H8V7h11v14Z"
+                              fill="currentColor"
+                            />
+                          </svg>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className={`furigana-toggle-button ${furiganaStates[index] ? 'active' : ''}`}
+                        aria-label={furiganaStates[index] ? 'Hide furigana' : 'Show furigana'}
+                        title={furiganaStates[index] ? 'Hide furigana' : 'Show furigana'}
+                        onClick={() => toggleFurigana(index)}
+                      >
+                        <svg className="furigana-icon" viewBox="0 0 24 24" aria-hidden="true">
+                          <text x="2" y="18" fontSize="14" fontWeight="bold" fill="currentColor">ふ</text>
                         </svg>
-                      ) : (
-                        <svg className="copy-icon" viewBox="0 0 24 24" aria-hidden="true">
-                          <path
-                            d="M16 1H5a2 2 0 0 0-2 2v14h2V3h11V1Zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H8V7h11v14Z"
-                            fill="currentColor"
-                          />
-                        </svg>
-                      )}
-                    </button>
+                      </button>
+                    </div>
                     <p
+                      className={furiganaStates[index] ? 'show-furigana' : ''}
                       dangerouslySetInnerHTML={{
                         __html: paragraphAnalysis[index]?.reading || paragraph,
                       }}
