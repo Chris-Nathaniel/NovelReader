@@ -64,12 +64,14 @@ function App() {
   const [search, setSearch] = useState('')
   const [coverUploadStatus, setCoverUploadStatus] = useState('')
   const [coverUploadError, setCoverUploadError] = useState('')
+  const [navOpen, setNavOpen] = useState(false)
   const importSourceRef = useRef(null)
   const [selectedNovelId, setSelectedNovelId] = useState(novels[0]?.id ?? null)
   const [selectedSection, setSelectedSection] = useState('all')
   const [selectedChapterId, setSelectedChapterId] = useState(null)
   const [chapterLoadingError, setChapterLoadingError] = useState('')
   const [isLoadingChapters, setIsLoadingChapters] = useState(false)
+  const [isChapterModalOpen, setIsChapterModalOpen] = useState(false)
 
   const getChapterCount = (novel) => novel?.chapters?.length ?? novel?.chapterCount ?? 0
 
@@ -202,7 +204,7 @@ function App() {
         if (novels.some((novel) => novel.id === novelId)) {
           setSelectedNovelId(novelId)
           setSelectedChapterId(chapterId)
-          setPage('chapter')
+          setIsChapterModalOpen(true)
           return
         }
       }
@@ -385,7 +387,7 @@ function App() {
 
   const openChapter = (chapterId) => {
     setSelectedChapterId(chapterId)
-    setPage('chapter')
+    setIsChapterModalOpen(true)
     window.history.replaceState(null, '', `#chapter-${selectedNovelId}-${chapterId}`)
   }
 
@@ -554,7 +556,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      <nav className="navbar">
+      <nav className={`navbar ${navOpen ? 'nav-open' : ''}`}>
         <div className="brand">
           <span className="brand-logo" style={{ backgroundImage: `url(${icon})` }}></span>
           <div>
@@ -568,14 +570,27 @@ function App() {
               <button
                 type="button"
                 className={tab.id === page ? 'nav-button active' : 'nav-button'}
-                onClick={() => navigateTo(tab.id)}
+                onClick={() => {
+                  navigateTo(tab.id)
+                  setNavOpen(false)
+                }}
               >
                 {tab.label}
               </button>
             </li>
           ))}
         </ul>
-        <svg className="navmenu" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="25" height="25" viewBox="0 0 50 50">
+        <svg 
+          className="navmenu" 
+          xmlns="http://www.w3.org/2000/svg" 
+          x="0px" 
+          y="0px" 
+          width="25" 
+          height="25" 
+          viewBox="0 0 50 50"
+          onClick={() => setNavOpen(!navOpen)}
+          style={{ cursor: 'pointer' }}
+        >
           <path d="M 3 9 A 1.0001 1.0001 0 1 0 3 11 L 47 11 A 1.0001 1.0001 0 1 0 47 9 L 3 9 z M 3 24 A 1.0001 1.0001 0 1 0 3 26 L 47 26 A 1.0001 1.0001 0 1 0 47 24 L 3 24 z M 3 39 A 1.0001 1.0001 0 1 0 3 41 L 47 41 A 1.0001 1.0001 0 1 0 47 39 L 3 39 z"></path>
         </svg>
       </nav>
@@ -747,7 +762,10 @@ function App() {
         <section className="detail-page">
           <div className="detail-panel-header">
             <button type="button" className="back-button" onClick={() => navigateTo('catalogue')}>
-              ← Back to catalogue
+              <svg className="back-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor" />
+              </svg>
+              Back to catalogue
             </button>
             <div className="detail-header-body">
               <img
@@ -832,117 +850,107 @@ function App() {
         </section>
       )}
 
-      {page === 'chapter' && selectedNovel && selectedChapter && (
-        <section className="detail-page">
-          <div className="detail-panel-header">
-            <div>
-              <h2>{selectedChapter.title}</h2>
-              <p className="detail-description">{selectedNovel.title}</p>
-            </div>
-            <button type="button" className="back-button" onClick={() => navigateTo('novel')}>
-              ← Back to chapter list
-            </button>
-          </div>
-
-          <div className="chapter-navigation">
-            <button
-              type="button"
-              className="chapter-nav-button"
-              onClick={goToPreviousChapter}
-              disabled={!previousChapter}
-            >
-              ← Previous chapter
-            </button>
-            <button
-              type="button"
-              className="chapter-nav-button"
-              onClick={goToNextChapter}
-              disabled={!nextChapter}
-            >
-              Next chapter →
-            </button>
-          </div>
-
-          <article className="chapter-content">
-            <div className="chapter-text">
-              {analysisLoading && (
-                <div className="loading-indicator" style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
-                  Loading furigana... This may take a moment.
+      {isChapterModalOpen && selectedNovel && selectedChapter && (
+        <div className="chapter-modal-overlay" onClick={() => setIsChapterModalOpen(false)}>
+          <div className="chapter-modal" onClick={(e) => e.stopPropagation()}>
+            <article className="chapter-content">
+              <div className="chapter-header">
+                <button type="button" className="back-button" onClick={() => setIsChapterModalOpen(false)} title="Close chapter" aria-label="Close chapter">
+                  <svg className="back-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor" />
+                  </svg>
+                  Back to chapters
+                </button>
+                <div className="detail-header-title">
+                  <h2>{selectedChapter.title}</h2>
+                  <p className="detail-description">{selectedNovel.title}</p>
                 </div>
-              )}
-              {chapterParagraphs ? (
-                chapterParagraphs.map((paragraph, index) => (
-                  <div key={index} className="chapter-paragraph-wrap">
-                    <div className="paragraph-buttons">
-                      <button
-                        type="button"
-                        className={`copy-paragraph-button ${copiedParagraphIndex === index ? 'copied' : ''}`}
-                        aria-label={copiedParagraphIndex === index ? 'Copied' : 'Copy chapter paragraph'}
-                        onClick={() => copyParagraphText(paragraphAnalysis[index]?.reading || paragraph, index)}
-                      >
-                        {copiedParagraphIndex === index ? (
-                          <svg className="copy-icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path
-                              d="M20.285 6.708a1 1 0 0 0-1.414-1.416L9 15.164l-3.87-3.87a1 1 0 0 0-1.414 1.414l4.577 4.577a1 1 0 0 0 1.414 0l10.578-10.577Z"
-                              fill="currentColor"
-                            />
-                          </svg>
-                        ) : (
-                          <svg className="copy-icon" viewBox="0 0 24 24" aria-hidden="true">
-                            <path
-                              d="M16 1H5a2 2 0 0 0-2 2v14h2V3h11V1Zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H8V7h11v14Z"
-                              fill="currentColor"
-                            />
-                          </svg>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        className={`furigana-toggle-button ${furiganaStates[index] ? 'active' : ''}`}
-                        aria-label={furiganaStates[index] ? 'Hide furigana' : 'Show furigana'}
-                        title={furiganaStates[index] ? 'Hide furigana' : 'Show furigana'}
-                        onClick={() => toggleFurigana(index)}
-                      >
-                        <svg className="furigana-icon" viewBox="0 0 25 25" aria-hidden="true">
-                          <text x="5" y="18" fontSize="14" fontWeight="bold" fill="currentColor">ふ</text>
-                        </svg>
-                      </button>
-                    </div>
-                    <p
-                      className={furiganaStates[index] ? 'show-furigana' : ''}
-                      dangerouslySetInnerHTML={{
-                        __html: paragraphAnalysis[index]?.reading || paragraph,
-                      }}
-                    />
+              </div>
+              <div className="chapter-text">
+                {analysisLoading && (
+                  <div className="loading-indicator" style={{ padding: '20px', textAlign: 'center', color: '#888' }}>
+                    Loading furigana... 
                   </div>
-                ))
-              ) : (
-                <div
-                  dangerouslySetInnerHTML={{ __html: selectedChapter.content }}
-                />
-              )}
-            </div>
-          </article>
-
-          <div className="chapter-navigation chapter-navigation-bottom">
-            <button
-              type="button"
-              className="chapter-nav-button"
-              onClick={goToPreviousChapter}
-              disabled={!previousChapter}
-            >
-              ← Previous chapter
-            </button>
-            <button
-              type="button"
-              className="chapter-nav-button"
-              onClick={goToNextChapter}
-              disabled={!nextChapter}
-            >
-              Next chapter →
-            </button>
+                )}
+                {chapterParagraphs ? (
+                  chapterParagraphs.map((paragraph, index) => (
+                    <div key={index} className="chapter-paragraph-wrap">
+                      <div className="paragraph-buttons">
+                        <button
+                          type="button"
+                          className={`copy-paragraph-button ${copiedParagraphIndex === index ? 'copied' : ''}`}
+                          aria-label={copiedParagraphIndex === index ? 'Copied' : 'Copy chapter paragraph'}
+                          onClick={() => copyParagraphText(paragraphAnalysis[index]?.reading || paragraph, index)}
+                        >
+                          {copiedParagraphIndex === index ? (
+                            <svg className="copy-icon" viewBox="0 0 24 24" aria-hidden="true">
+                              <path
+                                d="M20.285 6.708a1 1 0 0 0-1.414-1.416L9 15.164l-3.87-3.87a1 1 0 0 0-1.414 1.414l4.577 4.577a1 1 0 0 0 1.414 0l10.578-10.577Z"
+                                fill="currentColor"
+                              />
+                            </svg>
+                          ) : (
+                            <svg className="copy-icon" viewBox="0 0 24 24" aria-hidden="true">
+                              <path
+                                d="M16 1H5a2 2 0 0 0-2 2v14h2V3h11V1Zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H8V7h11v14Z"
+                                fill="currentColor"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          className={`furigana-toggle-button ${furiganaStates[index] ? 'active' : ''}`}
+                          aria-label={furiganaStates[index] ? 'Hide furigana' : 'Show furigana'}
+                          title={furiganaStates[index] ? 'Hide furigana' : 'Show furigana'}
+                          onClick={() => toggleFurigana(index)}
+                        >
+                          <svg className="furigana-icon" viewBox="0 0 25 25" aria-hidden="true">
+                            <text x="5" y="18" fontSize="14" fontWeight="bold" fill="currentColor">ふ</text>
+                          </svg>
+                        </button>
+                      </div>
+                      <p
+                        className={furiganaStates[index] ? 'show-furigana' : ''}
+                        dangerouslySetInnerHTML={{
+                          __html: paragraphAnalysis[index]?.reading || paragraph,
+                        }}
+                      />
+                    </div>
+                  ))
+                ) : (
+                  <div
+                    dangerouslySetInnerHTML={{ __html: selectedChapter.content }}
+                  />
+                )}
+                <div className="chapter-navigation">
+                  <button
+                    type="button"
+                    className="chapter-nav-button"
+                    onClick={goToPreviousChapter}
+                    disabled={!previousChapter}
+                  >
+                    <svg className="back-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor" />
+                    </svg>
+                    Previous chapter
+                  </button>
+                  <button
+                    type="button"
+                    className="chapter-nav-button"
+                    onClick={goToNextChapter}
+                    disabled={!nextChapter}
+                  >
+                    Next chapter
+                    <svg className="back-icon" viewBox="0 0 24 24" aria-hidden="true" style={{ transform: 'scaleX(-1)' }}>
+                      <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" fill="currentColor" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </article>
           </div>
-        </section>
+        </div>
       )}
 
       {page === 'completed' && (
